@@ -20,9 +20,9 @@ from scipy.signal import find_peaks
 DATA_PATH = "C:/Users/yzhao/matlab_projects/ECG_data/"
 SAVE_PATH = "./data/"
 
-# mat_file = "F32CSS3h_20122023_signals.mat" # good data
-mat_file = "F26C_07112023_signals.mat"  # medium data
-# mat_file = "M38A_23112023_signals.mat" # challenging data
+#mat_file = "F32CSS3h_20122023_signals.mat" # good data
+#mat_file = "F26C_07112023_signals.mat"  # medium data
+mat_file = "M38A_23112023_signals.mat" # challenging data
 save_file = os.path.join(SAVE_PATH, mat_file)
 
 mat = loadmat(os.path.join(DATA_PATH, mat_file))

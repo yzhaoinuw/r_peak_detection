@@ -14,7 +14,7 @@ import os
 
 import numpy as np
 from scipy.io import loadmat
-from scipy.signal import find_peaks
+#from scipy.signal import find_peaks
 
 import plotly.io as io
 import plotly.graph_objects as go
@@ -29,9 +29,9 @@ io.renderers.default = "browser"
 DATA_PATH = "./data/"
 CHECKPOINT_PATH = "./checkpoints/"
 
-# mat_file = "F32CSS3h_20122023_signals.mat" # good data
+#mat_file = "F32CSS3h_20122023_signals.mat" # good data
 mat_file = "F26C_07112023_signals.mat"  # medium data
-# mat_file = "M38A_23112023_signals.mat" # challenging data
+#mat_file = "M38A_23112023_signals.mat" # challenging data
 
 mat = loadmat(os.path.join(DATA_PATH, mat_file))
 ecg = mat["ECG"].flatten()
@@ -59,13 +59,13 @@ r_peak_inds = r_peak_inds.flatten()
 
 fig = FigureResampler(
     make_subplots(
-        rows=2,
+        rows=1,
         cols=1,
         shared_xaxes=True,
         vertical_spacing=0.05,
         subplot_titles=(
             "Raw ECG",
-            "Processed ECG",
+            #"Processed ECG",
         ),
         # row_heights=[0.5, 0.5],
     ),
@@ -76,7 +76,7 @@ fig = FigureResampler(
 # %% add ECG trace
 fig.add_trace(
     go.Scattergl(
-        name=" ",
+        name="ECG",
         line=dict(width=1),
         marker=dict(size=2, color="blue"),
         showlegend=False,
@@ -91,26 +91,30 @@ fig.add_trace(
 # %% add r peaks trace
 fig.add_trace(
     go.Scattergl(
-        name=" ",
+        name="Peak Confidence",
         marker=dict(
             symbol="circle-open",
             size=5,
             color=r_peak_conf,
-            colorscale="speed",  # one of plotly colorscales
-            showscale=True,
+            colorscale=[[0.0, 'red'], [1.0, 'green']],
+            cauto=False,
+            showscale=False,
             line=dict(
                 width=2,
             ),
         ),
-        showlegend=True,
+        showlegend=False,
         mode="markers",
+        customdata=r_peak_conf,
+        hovertemplate="<b>y</b>: %{y}"
+        + "<br><b>Confidence</b>: %{customdata:.2f}<extra></extra>",
     ),
     hf_x=time[r_peak_inds],
     hf_y=ecg[r_peak_inds],
     row=1,
     col=1,
 )
-
+'''
 fig.add_trace(
     go.Scattergl(
         name=" ",
@@ -124,6 +128,7 @@ fig.add_trace(
     row=2,
     col=1,
 )
+'''
 
 fig.update_layout(
     autosize=True,
@@ -139,13 +144,13 @@ fig.update_layout(
         yanchor="top",
         yref="container",
     ),
-    xaxis2=dict(tickformat="digits"),
+    xaxis1=dict(tickformat="digits"),
     modebar_remove=["lasso2d", "zoom", "autoScale"],
     dragmode="pan",
     clickmode="event",
 )
 
-fig.update_traces(xaxis="x2")  # gives crosshair across all subplots
+fig.update_traces(xaxis="x1")  # gives crosshair across all subplots
 fig.update_xaxes(
     range=[0, np.ceil(time[-1])],
     title_text="<b>Time (s)</b>",
@@ -157,7 +162,7 @@ fig.update_xaxes(
         ticklen=5,
         tickwidth=2,
     ),
-    row=2,
+    row=1,
     col=1,
 )
 
