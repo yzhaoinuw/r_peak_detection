@@ -8,6 +8,7 @@ Created on Mon Nov  4 19:05:54 2024
 import os
 
 import numpy as np
+from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
@@ -37,7 +38,7 @@ def validate_r_peaks(data: np.array, model_path, batch_size=64, decision_thresho
 
     r_peak_conf = []
     with torch.no_grad():
-        for segments in test_loader:
+        for _, segments in enumerate(tqdm(test_loader)):
             segments = segments.to(device)
             outputs = model(segments)
             r_peak_conf.extend(outputs.tolist())
