@@ -34,7 +34,9 @@ ecg = mat["ECG"].flatten()
 
 # %%
 end = len(ecg)
-r_peak_inds, _ = find_peaks(ecg, height=0, distance=50, prominence=(0.5, None))
+r_peak_inds, _ = find_peaks(
+    ecg, height=0, distance=50, prominence=(0.5, None)
+)  # try lower prom
 r_peak_inds = r_peak_inds[(15 <= r_peak_inds) & (r_peak_inds <= end - 16)]
 
 r_peak_inds = r_peak_inds[:, np.newaxis]

@@ -14,7 +14,8 @@ import os
 
 import numpy as np
 from scipy.io import loadmat
-#from scipy.signal import find_peaks
+
+# from scipy.signal import find_peaks
 
 import plotly.io as io
 import plotly.graph_objects as go
@@ -29,9 +30,9 @@ io.renderers.default = "browser"
 DATA_PATH = "./data/"
 CHECKPOINT_PATH = "./checkpoints/"
 
-#mat_file = "F32CSS3h_20122023_signals.mat" # good data
-mat_file = "F26C_07112023_signals.mat"  # medium data
-#mat_file = "M38A_23112023_signals.mat" # challenging data
+mat_file = "M22BC_signals.mat"  # good data
+# mat_file = "F26C_07112023_signals.mat"  # medium data
+# mat_file = "M38A_23112023_signals.mat" # challenging data
 
 mat = loadmat(os.path.join(DATA_PATH, mat_file))
 ecg = mat["ECG"].flatten()
@@ -65,7 +66,7 @@ fig = FigureResampler(
         vertical_spacing=0.05,
         subplot_titles=(
             "Raw ECG",
-            #"Processed ECG",
+            # "Processed ECG",
         ),
         # row_heights=[0.5, 0.5],
     ),
@@ -96,7 +97,7 @@ fig.add_trace(
             symbol="circle-open",
             size=5,
             color=r_peak_conf,
-            colorscale=[[0.0, 'red'], [1.0, 'green']],
+            colorscale=[[0.0, "red"], [1.0, "green"]],
             cauto=False,
             showscale=False,
             line=dict(
@@ -114,7 +115,7 @@ fig.add_trace(
     row=1,
     col=1,
 )
-'''
+"""
 fig.add_trace(
     go.Scattergl(
         name=" ",
@@ -128,7 +129,7 @@ fig.add_trace(
     row=2,
     col=1,
 )
-'''
+"""
 
 fig.update_layout(
     autosize=True,
