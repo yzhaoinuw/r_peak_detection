@@ -6,6 +6,7 @@ Created on Wed Oct 23 20:18:01 2024
 """
 
 import os
+import json
 import argparse
 
 import numpy as np
@@ -15,39 +16,47 @@ from scipy.io import loadmat, savemat
 from run_inference import validate_r_peaks
 
 
+CONFIG_FILE = "config.json"
+
 def main():
+    config = {}
+    params_updated = False
+    if os.path.isfile(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            config = json.load(f)
+    checkpoint_path = config.get("checkpoint_path", "./checkpoints/r_peak_classifier_out_8_dt_0.5.pth")
+    threshold = config.get("decision_threshold", 0.5)
+        
     parser = argparse.ArgumentParser(description="Extract R-peaks from ECG data.")
     parser.add_argument(
         "mat_file", type=str, help="Path to the .mat file containing the ECG data."
     )
-    # parser.add_argument("--save_path", type=str, default="", help="Path to save the output.")
     parser.add_argument(
         "--checkpoint_path",
         type=str,
-        default="./checkpoints/",
-        help="Path to the model checkpoints.",
+        help="Path to the model checkpoint.",
     )
-    parser.add_argument(
-        "--model_file",
-        type=str,
-        default="r_peak_classifier_out_8_dt_0.5.pth",
-        help="Name of the model checkpoint file.",
-    )
+    parser.add_argument("-threshold", "--threshold", type=float, help="The confidence threshold for good R-peaks.")
 
     args = parser.parse_args()
-
-    # Paths
     mat_file = args.mat_file
-    # save_file = args.save_path
     save_path = mat_file
-    checkpoint_path = args.checkpoint_path
-    model_path = os.path.join(checkpoint_path, args.model_file)
+    if args.checkpoint_path is not None:
+        checkpoint_path = args.checkpoint_path
+        config["checkpoint_path"] = checkpoint_path
+        params_updated = True
+    if args.threshold is not None:
+        threshold = args.threshold
+        config["decision_threshold"] = threshold
+        params_updated = True
+    if params_updated:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=4)
+    
 
     # Load .mat file
     mat = loadmat(mat_file)
     ecg = mat["ECG"].flatten()
-    time = mat["t_ECG"].flatten()
-    fs = round(time.size / time[-1])
 
     # Process ECG data
     end = len(ecg)
@@ -70,7 +79,7 @@ def main():
 
     # Validate R-peaks
     r_peak_inds = r_peak_inds.flatten()
-    r_peak_conf = validate_r_peaks(r_peak_segments, model_path)
+    r_peak_conf = validate_r_peaks(r_peak_segments, checkpoint_path, decision_threshold=threshold)
     good_peak_inds = r_peak_inds[r_peak_conf > 0.5]
 
     # Save outputs
