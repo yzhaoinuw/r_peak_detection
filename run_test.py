@@ -13,12 +13,14 @@ import torch
 from torch.utils.data import DataLoader
 
 from dataset import R_Peak_Dataset
-from models import R_Peak_Classifier
+from models import R_Peak_Classifier, R_Peak_Classifier_Large
 
 
 CHECKPOINT_PATH = "./checkpoints/"
 DATA_PATH = "./data/"
-model_path = os.path.join(CHECKPOINT_PATH, "r_peak_classifier_out_8_dt_0.5.pth")
+model_path = os.path.join(
+    CHECKPOINT_PATH, "r_peak_classifier_large_out1_32_out2_64_bs_32_dt_0.5.pth"
+)
 # %%
 data_file = os.path.join(DATA_PATH, "r_peak_test_data.npy")
 label_file = os.path.join(DATA_PATH, "r_peak_test_labels.npy")
@@ -41,7 +43,7 @@ decision_threshold = 0.5
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = R_Peak_Classifier()
+model = R_Peak_Classifier_Large(out1=32, out2=64, hidden_size=256)
 model.to(device)
 model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
 model.eval()

@@ -17,7 +17,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from dataset import R_Peak_Dataset
-from models import R_Peak_Classifier
+from models import R_Peak_Classifier, R_Peak_Classifier_Large
 
 DATA_PATH = "C:/Users/yzhao/matlab_projects/ECG_data/"
 SAVE_PATH = "./data/"
@@ -42,18 +42,20 @@ train_dataset = R_Peak_Dataset(train_data, train_labels, noise_prob=0.5)
 val_dataset = R_Peak_Dataset(val_data, val_labels)
 
 # Hyperparameters
-batch_size = 16
+batch_size = 32
 
 # Create DataLoader objects
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
 learning_rate = 0.001
-num_epochs = 30
+num_epochs = 50
 decision_threshold = 0.5
-out_channels = 8
+out1 = 32
+out2 = 64
+hidden_size = 256
 
-model_name = f"r_peak_classifier_out_{out_channels}_dt_{decision_threshold}"
+model_name = f"r_peak_classifier_large_out1_{out1}_out2_{out2}_hs_{hidden_size}_bs_{batch_size}_dt_{decision_threshold}"
 logger = logging.getLogger("logger")
 logging.getLogger().setLevel(logging.DEBUG)
 formatter = logging.Formatter("%(asctime)s: %(message)s")
@@ -62,16 +64,20 @@ file_handler = logging.FileHandler(
 )
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
+logger.addHandler(logging.StreamHandler())
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 torch.cuda.empty_cache()
-model = R_Peak_Classifier(out_channels=out_channels, hidden_size=16, dropout=0.5)
+model = R_Peak_Classifier_Large(out1=out1, out2=out2, hidden_size=hidden_size)
 model.to(device)
 criterion = nn.BCELoss()  # Binary Cross Entropy Loss
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, mode="min", factor=0.5, patience=5
+)
 
-best_val_accuracy = 0.95
+best_val_accuracy = 0.9
 for epoch in range(1, num_epochs + 1):
     # Validation
     model.eval()
@@ -87,6 +93,7 @@ for epoch in range(1, num_epochs + 1):
             correct_predictions += (predictions == labels).sum().item()
     val_loss /= len(val_dataset)
     val_accuracy = correct_predictions / len(val_dataset)
+    scheduler.step(val_loss)
 
     model.train()
     train_loss = 0.0
@@ -100,17 +107,19 @@ for epoch in range(1, num_epochs + 1):
         train_loss += loss.item() * segments.size(0)
     train_loss /= len(train_dataset)
 
-    logging.getLogger("logger").debug(f"Epoch {epoch}/{num_epochs}")
-    logging.getLogger("logger").debug(f"Train Loss: {train_loss:.4f}")
-    logging.getLogger("logger").debug(f"Val Loss: {val_loss:.4f}")
-    logging.getLogger("logger").debug(f"Val Accuracy: {val_accuracy:.4f}")
+    logger.debug(f"Epoch {epoch}/{num_epochs}")
+    logger.debug(f"Learning Rate: {scheduler.get_last_lr()}")
+    logger.debug(f"Train Loss: {train_loss:.4f}")
+    logger.debug(f"Val Loss: {val_loss:.4f}")
+    logger.debug(f"Val Accuracy: {val_accuracy:.4f}")
+    logger.debug("")
 
     # Check if validation accuracy exceeds 95% and increases
     if val_accuracy > best_val_accuracy:
         best_val_accuracy = val_accuracy
         checkpoint_path = os.path.join(CHECKPOINT_PATH, model_name + ".pth")
         torch.save(model.state_dict(), checkpoint_path)
-        logging.getLogger("logger").debug(f"Model saved to {checkpoint_path}")
+        logger.debug(f"Model saved to {checkpoint_path}")
 
 handlers = logger.handlers
 for handler in handlers:

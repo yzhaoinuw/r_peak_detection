@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 import numpy as np
+from scipy import stats
 from scipy.io import loadmat
 from scipy.signal import find_peaks
 
@@ -17,10 +18,11 @@ import matplotlib.pyplot as plt
 
 DATA_PATH = "C:/Users/yzhao/matlab_projects/ECG_data/"
 SAVE_PATH = "./data/"
+N = 64
 
 # mat_file = "F32CSS3h_20122023_signals.mat" # good data
-mat_file = "F26C_07112023_signals.mat"  # medium data
-# mat_file = "M38A_23112023_signals.mat" # challenging data
+# mat_file = "F26C_07112023_signals.mat"  # medium data
+mat_file = "M38A_23112023_signals.mat"  # challenging data
 
 mat_name = Path(mat_file).stem
 data_file = os.path.join(SAVE_PATH, "r_peak_test_data.npy")
@@ -37,11 +39,12 @@ end = len(ecg)
 r_peak_inds, _ = find_peaks(
     ecg, height=0, distance=50, prominence=(0.5, None)
 )  # try lower prom
-r_peak_inds = r_peak_inds[(15 <= r_peak_inds) & (r_peak_inds <= end - 16)]
+r_peak_inds = r_peak_inds[(N // 2 <= r_peak_inds) & (r_peak_inds <= end - N // 2)]
 
 r_peak_inds = r_peak_inds[:, np.newaxis]
-left_neighborhood_array = np.arange(-15, 1)
-right_neighborhood_array = np.arange(1, 17)
+left_neighborhood_array = np.arange(-N // 2, 1)
+right_neighborhood_array = np.arange(1, N // 2)
+
 # Use broadcasting to add the range_array to each start index
 left_segment_indices = r_peak_inds + left_neighborhood_array
 right_segment_indices = r_peak_inds + right_neighborhood_array
@@ -49,6 +52,7 @@ right_segment_indices = r_peak_inds + right_neighborhood_array
 r_peak_segment_indices = np.concatenate(
     (left_segment_indices, right_segment_indices), axis=1
 )
+
 r_peak_segments = ecg[r_peak_segment_indices]
 n_seg = len(r_peak_segments)
 # %%
@@ -78,7 +82,12 @@ rand_indices = np.random.permutation(ind_array)
 
 for ind in rand_indices:
     r_peak_segment = r_peak_segments[ind]
-    plt.plot(r_peak_segment, ".-")
+    r_peak_segment_standardized = stats.zscore(r_peak_segment)
+    f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+    ax1.plot(r_peak_segment, ".-")
+    ax1.plot(N // 2, r_peak_segment[N // 2], "ro", ms=2)
+    ax2.plot(r_peak_segment_standardized, ".-")
+    ax2.plot(N // 2, r_peak_segment_standardized[N // 2], "ro", ms=2)
     plt.show(block=False)
     label = input("Good Peak (1) / Bad Peak (0)\n")
     if label == "q":
