@@ -21,10 +21,10 @@ The installed console command is:
 detect-r-peaks path\to\recording.mat
 ```
 
-`setup.py` registers this command as:
+`pyproject.toml` registers this command as:
 
 ```text
-detect-r-peaks=detect_r_peaks:main
+detect-r-peaks=r_peak_detection.detect_r_peaks:main
 ```
 
 The CLI expects the input `.mat` file to contain:
@@ -43,9 +43,9 @@ After inference, the CLI writes these fields back to the same `.mat` file:
 
 ## Inference Pipeline
 
-The production path is split between `detect_r_peaks.py` and `run_inference.py`.
+The production path is split between `src/r_peak_detection/detect_r_peaks.py` and `src/r_peak_detection/run_inference.py`.
 
-`detect_r_peaks.py` handles command-line arguments, persistent config, `.mat` I/O, and candidate generation:
+`r_peak_detection.detect_r_peaks` handles command-line arguments, persistent config, `.mat` I/O, and candidate generation:
 
 ```python
 r_peak_inds, _ = find_candidate_peaks(ecg, fs, condition)
@@ -115,7 +115,7 @@ The model output is a flattened NumPy array of probabilities in `[0, 1]`.
 
 ## Models
 
-Model definitions live in `models.py`.
+Model definitions live in `src/r_peak_detection/models.py`.
 
 ### `R_Peak_Classifier`
 
@@ -160,12 +160,12 @@ checkpoints/r_peak_classifier_large_out1_32_out2_64_bs_32_dt_0.5.pth
 
 ## Configuration
 
-`config.json` stores the last-used inference settings:
+The CLI stores last-used inference settings in a user config file. Set `R_PEAK_DETECTION_CONFIG` to override the path. Otherwise Windows uses `%APPDATA%\r_peak_detection\config.json`, and other platforms use `~/.config/r_peak_detection/config.json`:
 
 ```json
 {
     "decision_threshold": 0.5,
-    "checkpoint_path": "C:\\Users\\yzhao\\python_projects\\r_peak_detection\\checkpoints\\r_peak_classifier_large_out1_32_out2_64_bs_32_dt_0.5.pth",
+    "checkpoint_path": "C:\\path\\to\\r_peak_classifier_large_out1_32_out2_64_bs_32_dt_0.5.pth",
     "condition": "wake"
 }
 ```
@@ -210,68 +210,57 @@ Important training behavior:
 
 `find_best_hyperparameters.py` is an older search script for the smaller model. It repeatedly trains/validates over random splits and records best validation accuracy.
 
-`evaluate.py` and `evaluate_gold_standard.py` are ad hoc analysis scripts for manually annotated segments and corrected labels. They are useful for understanding historical validation work, but they are not generalized test runners.
+Historical ad hoc evaluation scripts were removed from the production repo surface. Recreate focused validation scripts or tests as needed for future labeled datasets.
 
 ## Visualization and Inspection
 
-`visualize.py` opens an interactive Plotly/Plotly Resampler view of the ECG signal and detected candidates. Candidate markers are colored by model confidence from red to green.
+`visualize-r-peaks` opens an interactive Plotly/Plotly Resampler view of the ECG signal and detected candidates. Candidate markers are colored by model confidence from red to green. Visualization dependencies are optional and installed with `pip install -e .[visualization]`.
 
 The intended flow is:
 
 1. Run `detect-r-peaks recording.mat`.
-2. Run `python visualize.py recording.mat`.
+2. Run `visualize-r-peaks recording.mat`.
 3. Inspect confidence-colored candidate peaks in the browser.
 
-Development-only visualization and filtering experiments live in:
+The visualization server tries `127.0.0.1:8050` first and automatically moves to the next free port when that port is occupied. Users can force a port with `--port`, suppress browser opening with `--no-browser`, or opt out of same-session Dash cleanup with `--keep-existing-server`.
 
-- `apply_filter.py`
-- `detect_r_peaks_dev.py`
-- `make_figure_dev.py`
-- `sketch.py`
-
-These scripts contain hard-coded paths and example files, so treat them as notebooks/scripts rather than stable package APIs.
+The Plotly Resampler figure initially shows 4096 samples. When the visualization is run repeatedly in the same Spyder or Python session, the tool stops a previously registered Dash server on the selected port before launching the new one. It does not kill unrelated Python processes from old kernels or other applications.
 
 ## File Map
 
-- `detect_r_peaks.py`: installed CLI entry point; reads `.mat`, finds candidates, runs inference, writes outputs.
-- `run_inference.py`: reusable inference function for scoring candidate peak indices.
-- `models.py`: PyTorch CNN model definitions.
-- `dataset.py`: PyTorch `Dataset` wrapper for ECG segments and optional labels/noise augmentation.
+- `src/r_peak_detection/detect_r_peaks.py`: installed CLI entry point; reads `.mat`, finds candidates, runs inference, writes outputs.
+- `src/r_peak_detection/run_inference.py`: reusable inference function for scoring candidate peak indices.
+- `src/r_peak_detection/models.py`: PyTorch CNN model definitions.
+- `src/r_peak_detection/dataset.py`: PyTorch `Dataset` wrapper for ECG segments and optional labels/noise augmentation.
+- `src/r_peak_detection/checkpoints/`: bundled PyTorch checkpoints used by the installed CLI.
 - `run_train.py`: training script for the large CNN.
 - `run_test.py`: checkpoint evaluation against saved test arrays.
 - `make_r_peak_data.py`: interactive manual segment-labeling tool.
-- `visualize.py`: interactive confidence visualization for labeled `.mat` files.
-- `utils.py`: helper for reading manually marked good/bad segment ranges from CSV.
-- `config.json`: persisted CLI checkpoint, threshold, and condition defaults.
+- `src/r_peak_detection/visualize.py`: interactive confidence visualization for labeled `.mat` files.
 - `checkpoints/`: saved PyTorch checkpoint and log files.
 - `data/`: example/source `.mat` files, labeled segment arrays, annotations, and archived training arrays.
 
 ## Dependencies
 
-The package runtime requirements are listed in `requirements.txt`:
+The package runtime requirements are listed in `pyproject.toml`:
 
 - `numpy`
 - `scipy`
 - `torch`
 - `tqdm`
 
-Several development scripts also import packages that are not listed in `requirements.txt`, including:
+Optional extras in `pyproject.toml` include:
 
-- `scikit-learn`
-- `matplotlib`
-- `pandas`
-- `plotly`
-- `plotly-resampler`
-
-Developers running training, evaluation, or visualization scripts should install those additional packages.
+- `visualization`: `dash`, `plotly`, `plotly-resampler`
+- `training`: `scikit-learn`, `matplotlib`, `pandas`
 
 ## Current Implementation Notes
 
 - `detect_r_peaks.py` passes the configured threshold into `validate_r_peaks`, but `validate_r_peaks` currently only returns probabilities and does not apply the threshold internally.
 - Model selection is based on whether the checkpoint path string contains `"large"`. This works with the current checkpoint names, but it couples architecture selection to filename conventions.
-- Segment standardization divides by per-segment standard deviation without guarding against zero standard deviation.
+- Segment standardization now guards against zero standard deviation by using `1` for constant segments.
 - The CLI overwrites the input `.mat` file in place. This is convenient, but developers should use copies when testing.
-- Many development scripts contain hard-coded local paths and subject filenames. Keep production behavior concentrated in `detect_r_peaks.py`, `run_inference.py`, `models.py`, and `dataset.py`.
+- Development and training scripts still contain hard-coded local paths and subject filenames. Keep production behavior concentrated in the `src/r_peak_detection/` package.
 
 ## Common Developer Tasks
 
@@ -279,7 +268,7 @@ Developers running training, evaluation, or visualization scripts should install
 
 ```python
 from scipy.io import loadmat
-from run_inference import validate_r_peaks
+from r_peak_detection.run_inference import validate_r_peaks
 
 mat = loadmat("recording.mat")
 ecg = mat["ECG"].flatten()
@@ -302,7 +291,7 @@ Run the CLI once with explicit arguments:
 detect-r-peaks recording.mat --threshold 0.6 --condition dex --checkpoint_path path\to\checkpoint.pth
 ```
 
-Those values are saved to `config.json`.
+Those values are saved to the user config file.
 
 ### Train a new large-model checkpoint
 
@@ -310,7 +299,7 @@ Those values are saved to `config.json`.
 2. Adjust hyperparameters in `run_train.py` if needed.
 3. Run `python run_train.py`.
 4. Confirm the checkpoint architecture matches the constructor used by `validate_r_peaks`.
-5. Point `config.json` or `--checkpoint_path` to the new `.pth` file.
+5. Point the user config file or `--checkpoint_path` to the new `.pth` file.
 
 ## Open Questions for Future Cleanup
 
@@ -318,4 +307,4 @@ Those values are saved to `config.json`.
 - Should thresholding live in `validate_r_peaks`, in the CLI, or in a small shared helper so the threshold behavior is consistent everywhere?
 - Should the wake/dex detection presets be tuned against a manually corrected validation set and saved with explicit version labels?
 - Should checkpoint metadata explicitly encode model architecture and segment length instead of relying on checkpoint filename strings?
-- Should the package include separate runtime and development requirement files?
+- Should CI add heavier end-to-end inference tests against a tiny synthetic or fixture `.mat` file?

@@ -5,27 +5,26 @@ Created on Mon Nov  4 19:05:54 2024
 @author: yzhao
 """
 
-import os
-
 import numpy as np
 from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
 
-from dataset import R_Peak_Dataset
-from models import R_Peak_Classifier, R_Peak_Classifier_Large
+from .dataset import R_Peak_Dataset
+from .models import R_Peak_Classifier, R_Peak_Classifier_Large
 
 
 def validate_r_peaks(
-    ecg: np.array,
-    r_peak_inds: np.array,
+    ecg: np.ndarray,
+    r_peak_inds: np.ndarray,
     checkpoint_path,
     batch_size=64,
     decision_threshold=0.5,
 ):
     end = len(ecg)
     print("Validating peaks...")
+    checkpoint_path = str(checkpoint_path)
     if "large" in checkpoint_path:
         model = R_Peak_Classifier_Large()
         N = 64
@@ -57,6 +56,7 @@ def validate_r_peaks(
     # standardization
     mean = np.mean(r_peak_segments, axis=1, keepdims=True)
     std = np.std(r_peak_segments, axis=1, keepdims=True)
+    std = np.where(std == 0, 1, std)
     r_peak_segments = (r_peak_segments - mean) / std
 
     # Create Dataset objects
@@ -81,30 +81,3 @@ def validate_r_peaks(
     r_peak_conf = np.array(r_peak_conf)
     return r_peak_inds, r_peak_conf
 
-
-# %%
-if __name__ == "__main__":
-    from scipy.signal import find_peaks
-    from scipy.io import loadmat
-
-    CHECKPOINT_PATH = "./checkpoints/"
-    DATA_PATH = "./data/"
-    checkpoint_path = os.path.join(
-        CHECKPOINT_PATH, "r_peak_classifier_out_8_dt_0.5.pth"
-    )
-    checkpoint_path = os.path.join(
-        CHECKPOINT_PATH, "r_peak_classifier_large_out1_32_out2_64_bs_32_dt_0.5.pth"
-    )
-
-    mat_file = "F32CSS3h_20122023_signals.mat"  # good data
-    # mat_file = "F26C_07112023_signals.mat"  # medium data
-    # mat_file = "M38A_23112023_signals.mat" # challenging data
-
-    mat_file = os.path.join(DATA_PATH, mat_file)
-    mat = loadmat(mat_file)
-    ecg = mat["ECG"].flatten()
-
-    # Process ECG data
-    print("Finding peaks...")
-    r_peak_inds, _ = find_peaks(ecg, height=0, distance=50, prominence=(0.5, None))
-    r_peak_inds, r_peak_conf = validate_r_peaks(ecg, r_peak_inds, checkpoint_path)

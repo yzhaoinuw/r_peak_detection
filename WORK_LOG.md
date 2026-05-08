@@ -12,3 +12,14 @@
 - Added preprocessing/filtering helpers for future candidate-generation experiments, but left them inactive in the default presets to avoid reducing candidate recall before validation.
 - Validated the edited Python files with `C:\Users\yzhao\miniconda3\envs\ecg\python.exe -m py_compile`.
 - Compared candidate counts on `data/F26C_07112023_signals.mat`; the wake preset preserved all existing `detected_r_peaks`, while the dex preset was only slightly more selective.
+- Converted the runtime code to a `src/r_peak_detection` package with modern `pyproject.toml` metadata.
+- Added bundled checkpoint package data and made the large checkpoint the installed default model.
+- Added optional visualization dependencies and the `visualize-r-peaks` console command.
+- Added automatic visualization port selection with `--port`, `--host`, and `--no-browser` options.
+- Moved persistent CLI settings to a user config path, with `R_PEAK_DETECTION_CONFIG` as an override for tests and scripted runs.
+- Added basic `unittest` coverage and a GitHub Actions CI workflow.
+- Removed clear development sketch and historical evaluation scripts while preserving training and labeling scripts.
+- Removed top-level `detect_r_peaks.py` and `visualize.py` wrappers; the canonical scripts now live only under `src/r_peak_detection/` with Spyder-friendly editable `__main__` blocks.
+- Added direct-file execution support for `src/r_peak_detection/detect_r_peaks.py` in Spyder while preserving package-relative imports for CLI usage.
+- Hardened visualization server startup with TCP port probing, auto-retry on Dash address conflicts, and same-session Dash server cleanup.
+- Set the visualization resampler's initial displayed sample count to 4096.

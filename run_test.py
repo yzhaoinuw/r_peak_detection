@@ -12,8 +12,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from dataset import R_Peak_Dataset
-from models import R_Peak_Classifier, R_Peak_Classifier_Large
+from r_peak_detection.dataset import R_Peak_Dataset
+from r_peak_detection.models import R_Peak_Classifier_Large
 
 
 CHECKPOINT_PATH = "./checkpoints/"
@@ -30,6 +30,7 @@ labels = labels.astype(int)
 
 mean = np.mean(data, axis=1, keepdims=True)
 std = np.std(data, axis=1, keepdims=True)
+std = np.where(std == 0, 1, std)
 data = (data - mean) / std
 
 # Create Dataset objects

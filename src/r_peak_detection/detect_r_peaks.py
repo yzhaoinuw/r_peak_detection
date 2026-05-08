@@ -5,21 +5,26 @@ Created on Wed Oct 23 20:18:01 2024
 @author: yzhao
 """
 
-import os
 import json
 import argparse
+import os
 import sys
+from importlib.resources import files
+from pathlib import Path
 
 import numpy as np
-from scipy.signal import butter, find_peaks, sosfiltfilt
 from scipy.io import loadmat, savemat
+from scipy.signal import butter, find_peaks, sosfiltfilt
 
-from run_inference import validate_r_peaks
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from r_peak_detection.run_inference import validate_r_peaks
+else:
+    from .run_inference import validate_r_peaks
 
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(PROJECT_DIR, "config.json")
 DEFAULT_FS = 1000
+DEFAULT_CHECKPOINT = "r_peak_classifier_large_out1_32_out2_64_bs_32_dt_0.5.pth"
 DETECTION_PRESETS = {
     "wake": {
         "use_filter": False,
@@ -38,6 +43,21 @@ DETECTION_PRESETS = {
         "prominence_mad": None,
     },
 }
+
+
+def get_config_path():
+    configured_path = os.environ.get("R_PEAK_DETECTION_CONFIG")
+    if configured_path:
+        return Path(configured_path)
+
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        return Path(appdata) / "r_peak_detection" / "config.json"
+    return Path.home() / ".config" / "r_peak_detection" / "config.json"
+
+
+def get_default_checkpoint_path():
+    return str(files("r_peak_detection.checkpoints").joinpath(DEFAULT_CHECKPOINT))
 
 
 def parse_args(checkpoint_path):
@@ -78,6 +98,21 @@ def get_sampling_rate(mat):
     return round((time.size - 1) / duration)
 
 
+def load_config(config_path=None):
+    config_path = Path(config_path) if config_path is not None else get_config_path()
+    if not config_path.is_file():
+        return {}
+    with config_path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_config(config, config_path=None):
+    config_path = Path(config_path) if config_path is not None else get_config_path()
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    with config_path.open("w", encoding="utf-8") as f:
+        json.dump(config, f, indent=4)
+
+
 def filter_for_peak_detection(ecg, fs, highpass_hz, lowpass_hz):
     lowpass_hz = min(lowpass_hz, 0.45 * fs)
     sos = butter(
@@ -115,15 +150,9 @@ def find_candidate_peaks(ecg, fs, condition):
 
 
 def main(mat_file=None, threshold=None, checkpoint_path=None, condition=None):
-    config = {}
+    config = load_config()
     params_updated = False
-    if os.path.isfile(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            config = json.load(f)
-    default_checkpoint_path = config.get(
-        "checkpoint_path",
-        os.path.join(PROJECT_DIR, "checkpoints", "r_peak_classifier_out_8_dt_0.5.pth"),
-    )
+    default_checkpoint_path = config.get("checkpoint_path", get_default_checkpoint_path())
     default_threshold = config.get("decision_threshold", 0.5)
     default_condition = config.get("condition", "wake")
 
@@ -143,6 +172,8 @@ def main(mat_file=None, threshold=None, checkpoint_path=None, condition=None):
     if threshold is None:
         threshold = default_threshold
     else:
+        if threshold < 0 or threshold > 1:
+            raise ValueError("threshold must be between 0 and 1.")
         config["decision_threshold"] = threshold
         params_updated = True
 
@@ -158,8 +189,7 @@ def main(mat_file=None, threshold=None, checkpoint_path=None, condition=None):
 
     save_path = mat_file
     if params_updated:
-        with open(CONFIG_FILE, "w") as f:
-            json.dump(config, f, indent=4)
+        save_config(config)
 
     # Load .mat file
     mat = loadmat(mat_file)
@@ -185,7 +215,8 @@ def main(mat_file=None, threshold=None, checkpoint_path=None, condition=None):
 
 if __name__ == "__main__":
     # Edit these values when running this file directly in Spyder.
-    MAT_FILE = os.path.join(PROJECT_DIR, "data", "F26C_07112023_signals.mat")
+    PROJECT_DIR = Path(__file__).resolve().parents[2]
+    MAT_FILE = PROJECT_DIR / "data" / "M166-dex40-04032025_signals.mat"
     THRESHOLD = None
     CHECKPOINT_PATH = None
     CONDITION = None
@@ -194,7 +225,7 @@ if __name__ == "__main__":
         main()
     else:
         main(
-            mat_file=MAT_FILE,
+            mat_file=str(MAT_FILE),
             threshold=THRESHOLD,
             checkpoint_path=CHECKPOINT_PATH,
             condition=CONDITION,

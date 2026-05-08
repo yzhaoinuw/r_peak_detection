@@ -1,0 +1,1 @@
+"""Bundled model checkpoints."""

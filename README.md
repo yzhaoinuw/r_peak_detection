@@ -1,52 +1,96 @@
+# R-Peak Detection
+
+Command-line tools for detecting ECG R-peaks in MATLAB `.mat` files and, optionally, visualizing the detected peaks in a browser.
+
 ## Installation
-It is recommended that the user install Anaconda or Miniconda to create a virtual environment and use this package in the virtual environment. To install Miniconda, see https://docs.anaconda.com/miniconda/install/.
 
-Create an environment called *r_peak_detection*. In Anaconda Powershell Prompt, type
-```bash
-conda create -n r_peak_detection python=3.10
-```
+Create and activate a conda environment:
 
-After the environment is created, activate it by typing
 ```bash
+conda create -n r_peak_detection python=3.11
 conda activate r_peak_detection
 ```
 
-To install the package, download the code to your computer. Navigate to the folder r_peak_detection, then type
+Install the base CLI:
+
 ```bash
 pip install -e .
 ```
-Don't omit the "." at the end in the line above!
 
-## Usage
-### Preparation
-Activate your environment first.
-```bash
-conda activate r_peak_detection
-```
-### Running The Command
-To label the R peaks in a ECG mat file, use the command `detect-r-peaks` (which will be automatically set up after you followed the [Installation](###Installation) step) then give it the path to the mat file. for example, run
-```bash
-detect-r-peaks C:\Users\yzhao\python_projects\r_peak_detection\data\F26C_07112023_signals.mat
-```
-After running it, you will see the output
-```bash
-Finding peaks...
-Validating peaks...
-100%|█████████████████████████████████████████████████████████████████████████████| 1130/1130 [00:02<00:00, 415.43it/s]
-R-peak indices saved to C:\Users\yzhao\python_projects\r_peak_detection\data\F26C_07112023_signals.mat.
-```
-The results will be saved to the same mat file. The indices of R-peaks can be found in the field called `good_r_peaks`.
-#### Optional Arguments
-1. `-threshold`
+Install with the optional browser visualization tool:
 
-`-threshold` sets how confident the model needs to be to consider a peak as a good R-peak. The higher the value, the fewer good R-peaks you may see. The default decision threshold is *0.5*. If you want to use a different threshold, change it to the number (between *0* and *1*) you like, for example, *0.6*. Your threshold value will be remembered, so the next time you don't have to supply it again if you will be using the same number. Example command:
 ```bash
-detect-r-peaks C:\Users\yzhao\python_projects\r_peak_detection\data\F26C_07112023_signals.mat -threshold 0.6
+pip install -e .[visualization]
 ```
 
-2. `-checkpoint_path`
+For model training and labeling utilities, install the training extras too:
 
-`-checkpoint_path` sets the model to use. You can drag and drop the checkpoint file, ie., the *.pt* file into the commandline as a shortcut to get the path to the checkpoint file. Your model choice will also be remembered, so the next time you don't have to supply it again if you will be using the same model. Example command:
- ```bash
- detect-r-peaks C:\Users\yzhao\python_projects\r_peak_detection\data\F26C_07112023_signals.mat -checkpoint_path C:\Users\yzhao\python_projects\r_peak_detection\checkpoints\r_peak_classifier_large_out1_32_out2_64_bs_32_dt_0.5.pth
- ```
+```bash
+pip install -e .[visualization,training]
+```
+
+## Detect R-Peaks
+
+Run the detector on an ECG `.mat` file:
+
+```bash
+detect-r-peaks C:\path\to\recording_signals.mat
+```
+
+The input file must contain an `ECG` array. If `t_ECG` is present, the CLI uses it to estimate the sampling rate; otherwise it falls back to 1000 Hz.
+
+The command writes these arrays back into the same `.mat` file:
+
+- `detected_r_peaks`: candidate peak indices scored by the model
+- `r_peak_confidence`: model confidence for each candidate
+- `good_r_peaks`: candidates above the selected confidence threshold
+
+Optional arguments:
+
+```bash
+detect-r-peaks C:\path\to\recording_signals.mat --threshold 0.6
+detect-r-peaks C:\path\to\recording_signals.mat --condition dex
+detect-r-peaks C:\path\to\recording_signals.mat --checkpoint_path C:\path\to\checkpoint.pth
+```
+
+The default checkpoint is bundled with the package. If you pass a custom threshold, condition, or checkpoint path, the choice is remembered in a user config file for future runs.
+
+## Visualize R-Peaks
+
+Install the visualization extra first:
+
+```bash
+pip install -e .[visualization]
+```
+
+Then run:
+
+```bash
+visualize-r-peaks C:\path\to\recording_signals.mat
+```
+
+The visualization CLI starts at port `8050` and automatically moves to the next free port if needed. To choose a port yourself:
+
+```bash
+visualize-r-peaks C:\path\to\recording_signals.mat --port 8060
+```
+
+Useful options:
+
+```bash
+visualize-r-peaks C:\path\to\recording_signals.mat --host 127.0.0.1
+visualize-r-peaks C:\path\to\recording_signals.mat --no-browser
+visualize-r-peaks C:\path\to\recording_signals.mat --keep-existing-server
+```
+
+The viewer uses Plotly Resampler and initially shows 4096 samples for responsive inspection of long ECG recordings. When run repeatedly from the same Spyder or Python session, the tool stops an existing Dash server on the selected port before starting a new one.
+
+## Tests
+
+Run the basic test suite:
+
+```bash
+python -m unittest discover -s tests
+```
+
+The GitHub Actions workflow installs the package and runs the same tests.
